@@ -1,4 +1,3 @@
- url=https://github.com/7929048-oss/labs/blob/master/NetSdrClientApp/NetSdrClient.cs
 using System;
 using System.Net.Sockets;
 using System.Threading;
