@@ -1,4 +1,4 @@
-﻿﻿using System.Net;
+using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
@@ -42,7 +42,7 @@ public class UdpClientWrapper : IUdpClient, IDisposable // <-- Implement IDispos
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error receiving message: {ex.Message}");
+            Debug.WriteLine($"Error receiving message: {ex.Message}");
         }
     }
 
