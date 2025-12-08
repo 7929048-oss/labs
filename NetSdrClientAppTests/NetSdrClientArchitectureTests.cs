@@ -6,6 +6,7 @@ using NetSdrClientApp;
 using NetSdrClientApp.Networking;
 using NetSdrClientApp.Messages;
 using NUnit.Framework;
+using System.Net.Sockets;
 
 namespace NetSdrClientAppTests
 {
