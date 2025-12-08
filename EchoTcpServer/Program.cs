@@ -13,6 +13,7 @@ namespace EchoServer
         private readonly int _port;
         private TcpListener _listener = null!;
         private readonly CancellationTokenSource _cancellationTokenSource;
+        public int ListeningPort { get; private set; }
 
         //constuctor
         public EchoServer(int port)
@@ -25,6 +26,15 @@ namespace EchoServer
         {
             _listener = new TcpListener(IPAddress.Any, _port);
             _listener.Start();
+            try
+            {
+                ListeningPort = ((IPEndPoint)_listener.LocalEndpoint).Port;
+            }
+            catch
+            {
+                // ignore if unable to determine port
+                ListeningPort = _port;
+            }
             Console.WriteLine($"Server started on port {_port}.");
 
             while (!_cancellationTokenSource.Token.IsCancellationRequested)
@@ -77,7 +87,14 @@ namespace EchoServer
         public void Stop()
         {
             _cancellationTokenSource.Cancel();
-            _listener.Stop();
+            try
+            {
+                _listener?.Stop();
+            }
+            catch
+            {
+                // ignore
+            }
             _cancellationTokenSource.Dispose();
             Console.WriteLine("Server stopped.");
         }
