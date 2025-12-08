@@ -2,6 +2,7 @@
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using System.Diagnostics;
 
 namespace NetSdrClientApp.Networking;
 
@@ -22,7 +23,7 @@ public class UdpClientWrapper : IUdpClient, IDisposable // <-- Implement IDispos
     {
         _cts?.Dispose(); 
         _cts = new CancellationTokenSource();
-        Console.WriteLine("Start listening for UDP messages...");
+            Debug.WriteLine("Start listening for UDP messages...");
 
         try
         {
@@ -32,7 +33,7 @@ public class UdpClientWrapper : IUdpClient, IDisposable // <-- Implement IDispos
                 UdpReceiveResult result = await _udpClient.ReceiveAsync(_cts.Token);
                 MessageReceived?.Invoke(this, result.Buffer);
 
-                Console.WriteLine($"Received from {result.RemoteEndPoint}");
+                Debug.WriteLine($"Received from {result.RemoteEndPoint}");
             }
         }
         catch (OperationCanceledException)
@@ -47,16 +48,16 @@ public class UdpClientWrapper : IUdpClient, IDisposable // <-- Implement IDispos
 
     public void StopListening()
     {
-        try
-        {
-            _cts?.Cancel();
-            _udpClient?.Close();
-            Console.WriteLine("Stopped listening for UDP messages.");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error while stopping: {ex.Message}");
-        }
+            try
+            {
+                _cts?.Cancel();
+                _udpClient?.Close();
+                Debug.WriteLine("Stopped listening for UDP messages.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error while stopping: {ex.Message}");
+            }
     }
 
     public void Exit()
