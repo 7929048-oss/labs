@@ -1,4 +1,4 @@
-﻿using NetSdrClientApp.Messages;
+﻿﻿using NetSdrClientApp.Messages;
 using NetSdrClientApp.Networking;
 using System;
 using System.Collections.Generic;
@@ -10,12 +10,13 @@ using System.Threading.Tasks;
 using static NetSdrClientApp.Messages.NetSdrMessageHelper;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
+
 namespace NetSdrClientApp
 {
     public class NetSdrClient
     {
-        private ITcpClient _tcpClient;
-        private IUdpClient _udpClient;
+        private readonly ITcpClient _tcpClient;
+        private readonly IUdpClient _udpClient;
 
         public bool IQStarted { get; set; }
 
@@ -66,7 +67,7 @@ namespace NetSdrClientApp
                 return;
             }
 
-;           var iqDataMode = (byte)0x80;
+            var iqDataMode = (byte)0x80;
             var start = (byte)0x02;
             var fifo16bitCaptureMode = (byte)0x01;
             var n = (byte)1;
@@ -131,9 +132,9 @@ namespace NetSdrClientApp
             }
         }
 
-        private TaskCompletionSource<byte[]> responseTaskSource;
+        private TaskCompletionSource<byte[]>? _responseTaskSource;
 
-        private async Task<byte[]> SendTcpRequest(byte[] msg)
+        private async Task<byte[]?> SendTcpRequest(byte[] msg)
         {
             if (!_tcpClient.Connected)
             {
@@ -141,8 +142,8 @@ namespace NetSdrClientApp
                 return null;
             }
 
-            responseTaskSource = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var responseTask = responseTaskSource.Task;
+            _responseTaskSource = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Task<byte[]> responseTask = _responseTaskSource.Task;
 
             await _tcpClient.SendMessageAsync(msg);
 
@@ -154,10 +155,10 @@ namespace NetSdrClientApp
         private void _tcpClient_MessageReceived(object? sender, byte[] e)
         {
             //TODO: add Unsolicited messages handling here
-            if (responseTaskSource != null)
+            if (_responseTaskSource != null)
             {
-                responseTaskSource.SetResult(e);
-                responseTaskSource = null;
+                _responseTaskSource.SetResult(e);
+                _responseTaskSource = null;
             }
             Console.WriteLine("Response recieved: " + e.Select(b => Convert.ToString(b, toBase: 16)).Aggregate((l, r) => $"{l} {r}"));
         }
