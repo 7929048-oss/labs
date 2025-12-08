@@ -29,7 +29,7 @@ namespace NetSdrClientApp.Networking
         {
             if (Connected)
             {
-                Console.WriteLine($"Already connected to {_host}:{_port}");
+                System.Diagnostics.Debug.WriteLine($"Already connected to {_host}:{_port}");
                 return;
             }
 
@@ -39,12 +39,12 @@ namespace NetSdrClientApp.Networking
                 _cts = new CancellationTokenSource();
                 _tcpClient.Connect(_host, _port);
                 _stream = _tcpClient.GetStream();
-                Console.WriteLine($"Connected to {_host}:{_port}");
+                System.Diagnostics.Debug.WriteLine($"Connected to {_host}:{_port}");
                 _ = StartListeningAsync();
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to connect: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Failed to connect: {ex.Message}");
             }
         }
 
@@ -73,7 +73,7 @@ namespace NetSdrClientApp.Networking
         {
             if (Connected && _stream != null && _stream.CanWrite)
             {
-                Console.WriteLine($"Message sent: " + data.Select(b => Convert.ToString(b, toBase: 16)).Aggregate((l, r) => $"{l} {r}"));
+                System.Diagnostics.Debug.WriteLine($"Message sent: " + data.Select(b => Convert.ToString(b, toBase: 16)).Aggregate((l, r) => $"{l} {r}"));
                 await _stream.WriteAsync(data, 0, data.Length);
             }
             else
@@ -99,7 +99,7 @@ namespace NetSdrClientApp.Networking
             {
                 try
                 {
-                    Console.WriteLine($"Starting listening for incoming messages.");
+                    System.Diagnostics.Debug.WriteLine($"Starting listening for incoming messages.");
                     while (!_cts.Token.IsCancellationRequested)
                     {
                         byte[] buffer = new byte[8194];
@@ -116,11 +116,11 @@ namespace NetSdrClientApp.Networking
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error in listening loop: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Error in listening loop: {ex.Message}");
                 }
                 finally
                 {
-                    Console.WriteLine("Listener stopped.");
+                    System.Diagnostics.Debug.WriteLine("Listener stopped.");
                 }
             }
             else
