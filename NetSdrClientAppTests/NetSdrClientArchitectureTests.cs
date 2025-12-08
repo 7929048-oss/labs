@@ -6,7 +6,6 @@ using NetSdrClientApp;
 using NetSdrClientApp.Networking;
 using NetSdrClientApp.Messages;
 using NUnit.Framework;
-
 namespace NetSdrClientAppTests
 {
     [TestFixture]
