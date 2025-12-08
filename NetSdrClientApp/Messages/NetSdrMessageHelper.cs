@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.PortableExecutable;
-using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -10,9 +9,6 @@ namespace NetSdrClientApp.Messages
 {
     public static class NetSdrMessageHelper
     {
-        // Intentionally hold a socket reference to violate the architecture test
-        // (this makes the helper reference System.Net.Sockets types)
-        private static Socket? _socketHolder;
         private const short _maxMessageLength = 8191;
         private const short _maxDataItemMessageLength = 8194;
         private const short _msgHeaderLength = 2; //2 byte, 16 bit
