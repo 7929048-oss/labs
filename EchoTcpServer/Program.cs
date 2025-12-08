@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace EchoServer
 {
@@ -35,14 +36,14 @@ namespace EchoServer
                 // ignore if unable to determine port
                 ListeningPort = _port;
             }
-            Console.WriteLine($"Server started on port {_port}.");
+            Debug.WriteLine($"Server started on port {_port}.");
 
             while (!_cancellationTokenSource.Token.IsCancellationRequested)
             {
                 try
                 {
                     TcpClient client = await _listener.AcceptTcpClientAsync();
-                    Console.WriteLine("Client connected.");
+                    Debug.WriteLine("Client connected.");
 
                     _ = Task.Run(() => HandleClientAsync(client, _cancellationTokenSource.Token));
                 }
@@ -53,7 +54,7 @@ namespace EchoServer
                 }
             }
 
-            Console.WriteLine("Server shutdown.");
+            Debug.WriteLine("Server shutdown.");
         }
 
         private async Task HandleClientAsync(TcpClient client, CancellationToken token)
@@ -69,17 +70,17 @@ namespace EchoServer
                     {
                         // Echo back the received message
                         await stream.WriteAsync(buffer, 0, bytesRead, token);
-                        Console.WriteLine($"Echoed {bytesRead} bytes to the client.");
+                        Debug.WriteLine($"Echoed {bytesRead} bytes to the client.");
                     }
                 }
                 catch (Exception ex) when (!(ex is OperationCanceledException))
                 {
-                    Console.WriteLine($"Error: {ex.Message}");
+                    Debug.WriteLine($"Error: {ex.Message}");
                 }
                 finally
                 {
                     client.Close();
-                    Console.WriteLine("Client disconnected.");
+                    Debug.WriteLine("Client disconnected.");
                 }
             }
         }
@@ -96,7 +97,7 @@ namespace EchoServer
                 // ignore
             }
             _cancellationTokenSource.Dispose();
-            Console.WriteLine("Server stopped.");
+            Debug.WriteLine("Server stopped.");
         }
 
         public static void Main(string[] args)
@@ -112,10 +113,10 @@ namespace EchoServer
 
             using (var sender = new UdpTimedSender(host, port))
             {
-                Console.WriteLine("Press any key to stop sending...");
+                Debug.WriteLine("Press any key to stop sending...");
                 sender.StartSending(intervalMilliseconds);
 
-                Console.WriteLine("Press 'q' to quit...");
+                Debug.WriteLine("Press 'q' to quit...");
                 while (Console.ReadKey(intercept: true).Key != ConsoleKey.Q)
                 {
                     // Just wait until 'q' is pressed
@@ -123,7 +124,7 @@ namespace EchoServer
 
                 sender.StopSending();
                 server.Stop();
-                Console.WriteLine("Sender stopped.");
+                Debug.WriteLine("Sender stopped.");
             }
         }
     }
@@ -167,11 +168,11 @@ namespace EchoServer
                 var endpoint = new IPEndPoint(IPAddress.Parse(_host), _port);
 
                 _udpClient.Send(msg, msg.Length, endpoint);
-                Console.WriteLine($"Message sent to {_host}:{_port} ");
+                Debug.WriteLine($"Message sent to {_host}:{_port} ");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error sending message: {ex.Message}");
+                Debug.WriteLine($"Error sending message: {ex.Message}");
             }
         }
 
