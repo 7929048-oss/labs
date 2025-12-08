@@ -1,4 +1,4 @@
-﻿﻿using System;
+using System;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
@@ -63,7 +63,8 @@ namespace NetSdrClientApp.Networking
             }
             else
             {
-                Console.WriteLine("No active connection to disconnect.");
+                // Avoid noisy console output in tests when Disconnect is called without an active connection.
+                System.Diagnostics.Debug.WriteLine("Disconnect called with no active connection.");
             }
         }
 
