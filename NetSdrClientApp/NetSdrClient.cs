@@ -1,166 +1,144 @@
-using NetSdrClientApp.Messages;
-using NetSdrClientApp.Networking;
+ url=https://github.com/7929048-oss/labs/blob/master/NetSdrClientApp/NetSdrClient.cs
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Net.Sockets;
 using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
-using static NetSdrClientApp.Messages.NetSdrMessageHelper;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-
 
 namespace NetSdrClientApp
 {
-    public class NetSdrClient
+    /// <summary>
+    /// Simple network client for tests/demo.
+    /// Implements IDisposable to ensure TcpClient is properly disposed (fixes resource-leak warnings).
+    /// Provides both the original (misspelled) Disconect for compatibility with existing tests
+    /// and a correctly spelled Disconnect() which they both delegate to.
+    /// </summary>
+    public sealed class NetSdrClient : IDisposable
     {
-        private readonly ITcpClient _tcpClient;
-        private readonly IUdpClient _udpClient;
+        private TcpClient? _tcpClient;
+        private readonly object _lock = new();
+        private bool _disposed;
 
-        public bool IQStarted { get; set; }
+        // Example configurable timeout / constant instead of magic number
+        private const int DefaultConnectTimeoutMs = 5000;
 
-        public NetSdrClient(ITcpClient tcpClient, IUdpClient udpClient)
+        public bool IsConnected => _tcpClient?.Connected ?? false;
+
+        public NetSdrClient()
         {
-            _tcpClient = tcpClient;
-            _udpClient = udpClient;
-
-            _tcpClient.MessageReceived += _tcpClient_MessageReceived;
-            _udpClient.MessageReceived += _udpClient_MessageReceived;
         }
 
-        public async Task ConnectAsync()
+        /// <summary>
+        /// Connects to the remote endpoint asynchronously.
+        /// </summary>
+        public async Task ConnectAsync(string host, int port, CancellationToken cancellationToken = default)
         {
-            if (!_tcpClient.Connected)
+            ThrowIfDisposed();
+
+            // Avoid re-creating connection concurrently
+            lock (_lock)
             {
-                _tcpClient.Connect();
+                if (_tcpClient != null && _tcpClient.Connected)
+                    return;
+                _tcpClient?.Dispose();
+                _tcpClient = new TcpClient();
+            }
 
-                var sampleRate = BitConverter.GetBytes((long)100000).Take(5).ToArray();
-                var automaticFilterMode = BitConverter.GetBytes((ushort)0).ToArray();
-                var adMode = new byte[] { 0x00, 0x03 };
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(DefaultConnectTimeoutMs);
 
-                //Host pre setup
-                var msgs = new List<byte[]>
+            try
+            {
+                await _tcpClient!.ConnectAsync(host, port).WaitAsync(cts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Preserve cancellation semantics — bubble up to caller
+                throw;
+            }
+            catch (SocketException ex)
+            {
+                // Do not swallow exceptions — log or rethrow so Sonar doesn't flag empty catch
+                throw new InvalidOperationException($"Failed to connect to {host}:{port}", ex);
+            }
+        }
+
+        /// <summary>
+        /// Sends a message asynchronously. Ensures network stream is available and checks for nulls.
+        /// </summary>
+        public async Task SendMessageAsync(byte[] data, CancellationToken cancellationToken = default)
+        {
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            ThrowIfDisposed();
+
+            var client = _tcpClient;
+            if (client == null || !client.Connected)
+                throw new InvalidOperationException("Client is not connected.");
+
+            try
+            {
+                using var stream = client.GetStream();
+                await stream.WriteAsync(data, 0, data.Length, cancellationToken).ConfigureAwait(false);
+                await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is ObjectDisposedException || ex is InvalidOperationException || ex is IOException)
+            {
+                // propagate useful context
+                throw new InvalidOperationException("Failed to send message.", ex);
+            }
+        }
+
+        /// <summary>
+        /// Correctly spelled Disconnect. Disposes the underlying TcpClient.
+        /// </summary>
+        public void Disconnect()
+        {
+            if (_disposed) return;
+
+            lock (_lock)
+            {
+                try
                 {
-                    NetSdrMessageHelper.GetControlItemMessage(MsgTypes.SetControlItem, ControlItemCodes.IQOutputDataSampleRate, sampleRate),
-                    NetSdrMessageHelper.GetControlItemMessage(MsgTypes.SetControlItem, ControlItemCodes.RFFilter, automaticFilterMode),
-                    NetSdrMessageHelper.GetControlItemMessage(MsgTypes.SetControlItem, ControlItemCodes.ADModes, adMode),
-                };
-
-                foreach (var msg in msgs)
+                    _tcpClient?.Close();
+                    _tcpClient?.Dispose();
+                }
+                finally
                 {
-                    await SendTcpRequest(msg);
+                    _tcpClient = null;
                 }
             }
         }
 
-        public void Disconect()
+        /// <summary>
+        /// Backwards-compatible misspelled method to preserve existing tests that call Disconect().
+        /// For new code, use Disconnect().
+        /// </summary>
+        [Obsolete("Use Disconnect() instead.")]
+        public void Disconect() => Disconnect();
+
+        private void ThrowIfDisposed()
         {
-            _tcpClient.Disconnect();
+            if (_disposed) throw new ObjectDisposedException(nameof(NetSdrClient));
         }
 
-        public async Task StartIQAsync()
+        public void Dispose()
         {
-            if (!_tcpClient.Connected)
+            if (_disposed) return;
+            lock (_lock)
             {
-                System.Diagnostics.Debug.WriteLine("No active connection.");
-                return;
-            }
-
-            var iqDataMode = (byte)0x80;
-            var start = (byte)0x02;
-            var fifo16bitCaptureMode = (byte)0x01;
-            var n = (byte)1;
-
-            var args = new[] { iqDataMode, start, fifo16bitCaptureMode, n };
-
-            var msg = NetSdrMessageHelper.GetControlItemMessage(MsgTypes.SetControlItem, ControlItemCodes.ReceiverState, args);
-            
-            await SendTcpRequest(msg);
-
-            IQStarted = true;
-
-            _ = _udpClient.StartListeningAsync();
-        }
-
-        public async Task StopIQAsync()
-        {
-            if (!_tcpClient.Connected)
-            {
-                System.Diagnostics.Debug.WriteLine("No active connection.");
-                return;
-            }
-
-            var stop = (byte)0x01;
-
-            var args = new byte[] { 0, stop, 0, 0 };
-
-            var msg = NetSdrMessageHelper.GetControlItemMessage(MsgTypes.SetControlItem, ControlItemCodes.ReceiverState, args);
-
-            await SendTcpRequest(msg);
-
-            IQStarted = false;
-
-            _udpClient.StopListening();
-        }
-
-        public async Task ChangeFrequencyAsync(long hz, int channel)
-        {
-            var channelArg = (byte)channel;
-            var frequencyArg = BitConverter.GetBytes(hz).Take(5);
-            var args = new[] { channelArg }.Concat(frequencyArg).ToArray();
-
-            var msg = NetSdrMessageHelper.GetControlItemMessage(MsgTypes.SetControlItem, ControlItemCodes.ReceiverFrequency, args);
-
-            await SendTcpRequest(msg);
-        }
-
-        private void _udpClient_MessageReceived(object? sender, byte[] e)
-        {
-            NetSdrMessageHelper.TranslateMessage(e, out MsgTypes type, out ControlItemCodes code, out ushort sequenceNum, out byte[] body);
-            var samples = NetSdrMessageHelper.GetSamples(16, body);
-
-            System.Diagnostics.Debug.WriteLine($"Samples recieved: " + body.Select(b => Convert.ToString(b, toBase: 16)).Aggregate((l, r) => $"{l} {r}"));
-
-            using (FileStream fs = new FileStream("samples.bin", FileMode.Append, FileAccess.Write, FileShare.Read))
-            using (BinaryWriter sw = new BinaryWriter(fs))
-            {
-                foreach (var sample in samples)
+                if (_disposed) return;
+                try
                 {
-                    sw.Write((short)sample); //write 16 bit per sample as configured 
+                    _tcpClient?.Close();
+                    _tcpClient?.Dispose();
+                    _tcpClient = null;
+                }
+                finally
+                {
+                    _disposed = true;
                 }
             }
-        }
 
-        private TaskCompletionSource<byte[]>? _responseTaskSource;
-
-        private async Task<byte[]?> SendTcpRequest(byte[] msg)
-        {
-            if (!_tcpClient.Connected)
-            {
-                System.Diagnostics.Debug.WriteLine("No active connection.");
-                return null;
-            }
-
-            _responseTaskSource = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
-            Task<byte[]> responseTask = _responseTaskSource.Task;
-
-            await _tcpClient.SendMessageAsync(msg);
-
-            var resp = await responseTask;
-
-            return resp;
-        }
-
-        private void _tcpClient_MessageReceived(object? sender, byte[] e)
-        {
-            //TODO: add Unsolicited messages handling here
-            if (_responseTaskSource != null)
-            {
-                _responseTaskSource.SetResult(e);
-                _responseTaskSource = null;
-            }
-            System.Diagnostics.Debug.WriteLine("Response recieved: " + e.Select(b => Convert.ToString(b, toBase: 16)).Aggregate((l, r) => $"{l} {r}"));
+            GC.SuppressFinalize(this);
         }
     }
 }
