@@ -82,7 +82,7 @@ namespace EchoServer
             Console.WriteLine("Server stopped.");
         }
 
-        public static async Task Main(string[] args)
+        public static void Main(string[] args)
         {
             EchoServer server = new EchoServer(5000);
 
