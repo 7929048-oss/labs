@@ -1,40 +1,46 @@
-using System;
-using System.Text;
-using System.Threading.Tasks;
+using NetSdrClientApp;
+using NetSdrClientApp.Networking;
 
-namespace NetSdrClientApp
+Console.WriteLine(@"Usage:
+C - connect
+D - disconnet
+F - set frequency
+S - Start/Stop IQ listener
+Q - quit");
+
+var tcpClient = new TcpClientWrapper("127.0.0.1", 5000);
+var udpClient = new UdpClientWrapper(60000);
+
+var netSdr = new NetSdrClient(tcpClient, udpClient);
+
+while (true)
 {
-    internal static class Program
+    var key = Console.ReadKey(intercept: true).Key;
+    if (key == ConsoleKey.C)
     {
-        // Minimal, safe example using NetSdrClient and demonstrating proper disposal and exception handling.
-        private static async Task<int> Main(string[] args)
+        await netSdr.ConnectAsync();
+    }
+    else if (key == ConsoleKey.D)
+    {
+        netSdr.Disconect();
+    }
+    else if (key == ConsoleKey.F)
+    {
+        await netSdr.ChangeFrequencyAsync(20000000, 1);
+    }
+    else if (key == ConsoleKey.S)
+    {
+        if (netSdr.IQStarted)
         {
-            // Simple argument parsing with null/empty checks avoids potential NREs
-            var host = args.Length > 0 && !string.IsNullOrWhiteSpace(args[0]) ? args[0] : "localhost";
-            var port = 12345;
-
-            try
-            {
-                await using var client = new NetSdrClient();
-                await client.ConnectAsync(host, port);
-
-                var payload = Encoding.UTF8.GetBytes("hello");
-                await client.SendMessageAsync(payload);
-
-                client.Disconnect();
-                return 0;
-            }
-            catch (OperationCanceledException)
-            {
-                Console.Error.WriteLine("Operation was canceled.");
-                return 2;
-            }
-            catch (Exception ex)
-            {
-                // Avoid empty catch — write meaningful error for diagnostics
-                Console.Error.WriteLine($"Unexpected error: {ex.Message}");
-                return 1;
-            }
+            await netSdr.StopIQAsync();
         }
+        else
+        {
+            await netSdr.StartIQAsync();
+        }
+    }
+    else if (key == ConsoleKey.Q)
+    {
+        break;
     }
 }
