@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.PortableExecutable;
@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 
 namespace NetSdrClientApp.Messages
 {
-    //TODO: analyze possible use of [StructLayout] for better performance and readability 
     public static class NetSdrMessageHelper
     {
         private const short _maxMessageLength = 8191;
@@ -28,7 +27,7 @@ namespace NetSdrClientApp.Messages
             DataItem3
         }
 
-        public enum ControlItemCodes
+        public enum ControlItemCodes : ushort
         {
             None = 0,
             IQOutputDataSampleRate = 0x00B8,
@@ -108,25 +107,32 @@ namespace NetSdrClientApp.Messages
 
         public static IEnumerable<int> GetSamples(ushort sampleSize, byte[] body)
         {
-            sampleSize /= 8; //to bytes
-            if (sampleSize  > 4)
-            {
-                throw new ArgumentOutOfRangeException();
-            }
+            int bytesCount = sampleSize / 8;
 
-            var bodyEnumerable = body as IEnumerable<byte>;
-            var prefixBytes = Enumerable.Range(0, 4 - sampleSize)
-                                      .Select(b => (byte)0);
+            if (bytesCount > 4)
+            {
+                throw new ArgumentOutOfRangeException(nameof(sampleSize));
+            }
+            ArgumentNullException.ThrowIfNull(body);
+
+            return GetSamplesIterator(bytesCount, body);
+        }
+
+        private static IEnumerable<int> GetSamplesIterator(int sampleSize, IEnumerable<byte> bodyEnumerable)
+        {
+            var prefixBytes = Enumerable.Repeat((byte)0, 4 - sampleSize);
 
             while (bodyEnumerable.Count() >= sampleSize)
             {
                 yield return BitConverter.ToInt32(bodyEnumerable
                     .Take(sampleSize)
                     .Concat(prefixBytes)
-                    .ToArray());
+                    .ToArray(), 0);
+
                 bodyEnumerable = bodyEnumerable.Skip(sampleSize);
             }
         }
+        
 
         private static byte[] GetHeader(MsgTypes type, int msgLength)
         {
