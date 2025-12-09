@@ -22,9 +22,9 @@ namespace NetSdrClientAppTests
             bool ok = NetSdrMessageHelper.TranslateMessage(msg, out var type, out var code, out ushort seq, out var body);
 
             Assert.IsTrue(ok);
-            Assert.AreEqual(NetSdrMessageHelper.MsgTypes.SetControlItem, type);
-            Assert.AreEqual(NetSdrMessageHelper.ControlItemCodes.IQOutputDataSampleRate, code);
-            Assert.AreEqual(parameters.Length, body.Length);
+            Assert.That(type, Is.EqualTo(NetSdrMessageHelper.MsgTypes.SetControlItem));
+            Assert.That(code, Is.EqualTo(NetSdrMessageHelper.ControlItemCodes.IQOutputDataSampleRate));
+            Assert.That(body.Length, Is.EqualTo(parameters.Length));
             CollectionAssert.AreEqual(parameters, body);
         }
 
@@ -33,7 +33,7 @@ namespace NetSdrClientAppTests
         {
             var body = new byte[] { 0x01, 0x02, 0x03, 0x04 };
             var samples = NetSdrMessageHelper.GetSamples(16, body).ToArray();
-            Assert.AreEqual(2, samples.Length);
+            Assert.That(samples.Length, Is.EqualTo(2));
 
             // invalid sample size (>32 bits) -> should throw
             Assert.Throws<ArgumentOutOfRangeException>(() => NetSdrMessageHelper.GetSamples(40, body).ToArray());
@@ -44,7 +44,6 @@ namespace NetSdrClientAppTests
         {
             var tcpMock = new Mock<ITcpClient>();
             var udpMock = new Mock<IUdpClient>();
-
             tcpMock.SetupGet(t => t.Connected).Returns(true);
             tcpMock.Setup(t => t.SendMessageAsync(It.IsAny<byte[]>())).Returns(Task.CompletedTask)
                 .Callback<byte[]>((msg) => tcpMock.Raise(m => m.MessageReceived += null, tcpMock.Object, new byte[] { 0, 1, 2 }));
@@ -81,7 +80,7 @@ namespace NetSdrClientAppTests
             var c = new NetSdrClientApp.Networking.UdpClientWrapper(54321);
 
             Assert.IsTrue(a.Equals(b));
-            Assert.AreEqual(a.GetHashCode(), b.GetHashCode());
+            Assert.That(b.GetHashCode(), Is.EqualTo(a.GetHashCode()));
             Assert.IsFalse(a.Equals(c));
         }
     }
